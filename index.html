@@ -189,25 +189,30 @@
         // 4. Contrôle Master avec synchronisation améliorée
         masterBtn.addEventListener('click', async () => {
             if (!isPlaying) {
-                // Réinitialiser toutes les pistes au même point de départ
+                // 1. Pause toutes les pistes d'abord (au cas où)
+                audioElements.forEach(audio => audio.pause());
+                
+                // 2. Appliquer le statut muted
                 audioElements.forEach((audio, index) => {
-                    audio.currentTime = 0;
-                    // S'assurer que le statut muted est correct avant de jouer
                     const card = mixerContainer.children[index];
                     audio.muted = !card.classList.contains('active');
                 });
                 
-                // Attendre un court instant pour que tous les currentTime soient bien à 0
-                await new Promise(resolve => setTimeout(resolve, 10));
-                
-                // Démarrer toutes les pistes en même temps avec Promise.all
-                const playPromises = audioElements.map(audio => {
-                    return audio.play().catch(err => {
-                        console.error('Erreur de lecture:', err);
-                    });
+                // 3. Réinitialiser au même point de départ
+                audioElements.forEach(audio => {
+                    audio.currentTime = 0;
                 });
                 
-                await Promise.all(playPromises);
+                // 4. Démarrer TOUTES les pistes de manière synchrone
+                // On ne fait pas await pour chaque promesse individuellement
+                try {
+                    // Lancer toutes les lectures en même temps
+                    for (const audio of audioElements) {
+                        audio.play().catch(err => console.error('Erreur:', err));
+                    }
+                } catch (err) {
+                    console.error('Erreur de lecture:', err);
+                }
                 
                 masterBtn.innerText = "⏸ Pause";
                 masterBtn.style.backgroundColor = "#ffa502";
