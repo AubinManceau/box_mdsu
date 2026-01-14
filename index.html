@@ -137,7 +137,8 @@
             const audio = new Audio(track.file);
             audio.loop = true;
             audio.preload = 'metadata'; // Charge seulement les métadonnées (meilleur pour mobile)
-            audio.volume = track.defaultMute ? 0 : 1;
+            audio.volume = 1; // Volume toujours à 1
+            audio.muted = track.defaultMute; // Utiliser muted au lieu de volume pour le mute
             audioElements.push(audio);
 
             // 2. HTML UI Setup
@@ -189,8 +190,11 @@
         masterBtn.addEventListener('click', async () => {
             if (!isPlaying) {
                 // Réinitialiser toutes les pistes au même point de départ
-                audioElements.forEach(audio => {
+                audioElements.forEach((audio, index) => {
                     audio.currentTime = 0;
+                    // S'assurer que le statut muted est correct avant de jouer
+                    const card = mixerContainer.children[index];
+                    audio.muted = !card.classList.contains('active');
                 });
                 
                 // Attendre un court instant pour que tous les currentTime soient bien à 0
@@ -218,11 +222,11 @@
 
         function toggleMute(index, cardElement) {
             const audio = audioElements[index];
-            if (audio.volume === 0) {
-                audio.volume = 1;
+            if (audio.muted) {
+                audio.muted = false;
                 cardElement.classList.add('active');
             } else {
-                audio.volume = 0;
+                audio.muted = true;
                 cardElement.classList.remove('active');
             }
         }
