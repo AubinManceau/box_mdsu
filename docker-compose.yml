@@ -1,0 +1,24 @@
+version: '3.8'
+
+name: box_mdsu
+services:
+  box_mdsu:
+    container_name: box_mdsu
+    image: nginx:alpine
+    networks:
+      - traefik_net
+    volumes:
+      - ./:/usr/share/nginx/html:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.box_mdsu.rule=Host(`${WEB_DOMAIN}`)"
+      - "traefik.http.routers.box_mdsu.entrypoints=websecure"
+      - "traefik.http.routers.box_mdsu.tls.certresolver=resolver"
+      - "traefik.http.services.box_mdsu.loadbalancer.server.port=80"
+    expose:
+      - "80"
+    restart: unless-stopped
+
+networks:
+  traefik_net:
+    external: true

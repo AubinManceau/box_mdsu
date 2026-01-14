@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mixeur Multipiste - Temps Réel</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #222;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        h1 { margin-bottom: 20px; }
+
+        #master-control {
+            background-color: #ff4757;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-bottom: 30px;
+            transition: transform 0.2s;
+            text-transform: uppercase;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);
+        }
+
+        #master-control:hover { transform: scale(1.05); background-color: #ff6b81; }
+
+        .tracks-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            width: 90%;
+            max-width: 700px;
+        }
+
+        .track-card {
+            background-color: #333;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            opacity: 0.6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .track-card:hover { background-color: #444; }
+
+        .track-card.active {
+            opacity: 1;
+            border-color: #2ed573;
+            background-color: #1e3a2a;
+            box-shadow: 0 0 15px rgba(46, 213, 115, 0.2);
+        }
+
+        .icon { font-size: 30px; margin-bottom: 5px; }
+        .label { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+        
+        /* Styles pour la barre de progression et le temps */
+        .time-info {
+            font-family: monospace;
+            font-size: 14px;
+            color: #ddd;
+            margin-bottom: 5px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 6px;
+            background-color: #555;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #2ed573;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        /* Si la piste est mute, la barre est grise */
+        .track-card:not(.active) .progress-bar {
+            background-color: #888;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Studio 4 Pistes</h1>
+
+    <button id="master-control">▶ Lecture</button>
+
+    <div class="tracks-container" id="mixer"></div>
+
+    <script>
+        const tracksConfig = [
+            { name: 'Piano',   file: 'pianorogn.mp3',   icon: '🎹', defaultMute: false },
+            { name: 'Guitare', file: 'guitar.mp3',  icon: '🎸', defaultMute: true },
+            { name: 'Trompette', file: 'trumperrogn.mp3', icon: '🎺', defaultMute: true },
+            { name: 'Batterie', file: 'drums.mp3',   icon: '🥁', defaultMute: true }
+        ];
+
+        const audioElements = [];
+        let isPlaying = false;
+        const masterBtn = document.getElementById('master-control');
+        const mixerContainer = document.getElementById('mixer');
+
+        // Fonction utilitaire pour formater le temps (ex: 125s -> 02:05)
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return "00:00";
+            const minutes = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${minutes < 10 ? '0' : ''}${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+
+        tracksConfig.forEach((track, index) => {
+            // 1. Audio Setup
+            const audio = new Audio(track.file);
+            audio.loop = true;
+            audio.preload = 'metadata'; // Charge les métadonnées pour avoir la durée
+            audio.volume = track.defaultMute ? 0 : 1;
+            audioElements.push(audio);
+
+            // 2. HTML UI Setup
+            const card = document.createElement('div');
+            card.className = `track-card ${track.defaultMute ? '' : 'active'}`;
+            
+            // On structure la carte avec les temps et la barre
+            card.innerHTML = `
+                <div class="icon">${track.icon}</div>
+                <div class="label">${track.name}</div>
+                
+                <div class="time-info">
+                    <span class="current-time">00:00</span>
+                    <span class="total-time">--:--</span>
+                </div>
+                
+                <div class="progress-container">
+                    <div class="progress-bar"></div>
+                </div>
+            `;
+
+            const progressBar = card.querySelector('.progress-bar');
+            const currentTimeEl = card.querySelector('.current-time');
+            const totalTimeEl = card.querySelector('.total-time');
+
+            // 3. Gestionnaires d'événements
+            
+            // Quand les infos du fichier sont chargées (pour afficher la durée totale)
+            audio.addEventListener('loadedmetadata', () => {
+                totalTimeEl.innerText = formatTime(audio.duration);
+            });
+
+            // Quand le temps avance (mise à jour barre et compteur)
+            audio.addEventListener('timeupdate', () => {
+                currentTimeEl.innerText = formatTime(audio.currentTime);
+                const percent = (audio.currentTime / audio.duration) * 100;
+                progressBar.style.width = `${percent}%`;
+            });
+
+            // Clic pour Mute/Unmute
+            card.addEventListener('click', (e) => {
+                toggleMute(index, card);
+            });
+
+            mixerContainer.appendChild(card);
+        });
+
+        // 4. Contrôle Master
+        masterBtn.addEventListener('click', () => {
+            if (!isPlaying) {
+                audioElements.forEach(audio => {
+                    // Petite astuce de synchro : on force tout le monde au même temps
+                    // si on lance la lecture depuis le début
+                    if (audio.currentTime < 0.5) audio.currentTime = 0; 
+                    audio.play();
+                });
+                masterBtn.innerText = "⏸ Pause";
+                masterBtn.style.backgroundColor = "#ffa502";
+                isPlaying = true;
+            } else {
+                audioElements.forEach(audio => audio.pause());
+                masterBtn.innerText = "▶ Lecture";
+                masterBtn.style.backgroundColor = "#ff4757";
+                isPlaying = false;
+            }
+        });
+
+        function toggleMute(index, cardElement) {
+            const audio = audioElements[index];
+            if (audio.volume === 0) {
+                audio.volume = 1;
+                cardElement.classList.add('active');
+            } else {
+                audio.volume = 0;
+                cardElement.classList.remove('active');
+            }
+        }
+    </script>
+</body>
+</html>
