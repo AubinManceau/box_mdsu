@@ -123,6 +123,10 @@
         let isPlaying = false;
         const masterBtn = document.getElementById('master-control');
         const mixerContainer = document.getElementById('mixer');
+        
+        // Précharger tous les fichiers audio
+        let loadedCount = 0;
+        const totalTracks = tracksConfig.length;
 
         // Fonction utilitaire pour formater le temps (ex: 125s -> 02:05)
         function formatTime(seconds) {
@@ -136,7 +140,7 @@
             // 1. Audio Setup
             const audio = new Audio(track.file);
             audio.loop = true;
-            audio.preload = 'metadata'; // Charge les métadonnées pour avoir la durée
+            audio.preload = 'auto'; // Précharge complètement le fichier
             audio.volume = track.defaultMute ? 0 : 1;
             audioElements.push(audio);
 
@@ -169,6 +173,15 @@
             audio.addEventListener('loadedmetadata', () => {
                 totalTimeEl.innerText = formatTime(audio.duration);
             });
+            
+            // Vérifier que le fichier est complètement chargé
+            audio.addEventListener('canplaythrough', () => {
+                loadedCount++;
+                if (loadedCount === totalTracks) {
+                    masterBtn.disabled = false;
+                    masterBtn.style.opacity = '1';
+                }
+            });
 
             // Quand le temps avance (mise à jour barre et compteur)
             audio.addEventListener('timeupdate', () => {
@@ -184,16 +197,31 @@
 
             mixerContainer.appendChild(card);
         });
+        
+        // Désactiver le bouton jusqu'à ce que tous les fichiers soient chargés
+        masterBtn.disabled = true;
+        masterBtn.style.opacity = '0.5';
 
-        // 4. Contrôle Master
-        masterBtn.addEventListener('click', () => {
+        // 4. Contrôle Master avec synchronisation améliorée
+        masterBtn.addEventListener('click', async () => {
             if (!isPlaying) {
+                // Réinitialiser toutes les pistes au même point de départ
                 audioElements.forEach(audio => {
-                    // Petite astuce de synchro : on force tout le monde au même temps
-                    // si on lance la lecture depuis le début
-                    if (audio.currentTime < 0.5) audio.currentTime = 0; 
-                    audio.play();
+                    audio.currentTime = 0;
                 });
+                
+                // Attendre un court instant pour que tous les currentTime soient bien à 0
+                await new Promise(resolve => setTimeout(resolve, 10));
+                
+                // Démarrer toutes les pistes en même temps avec Promise.all
+                const playPromises = audioElements.map(audio => {
+                    return audio.play().catch(err => {
+                        console.error('Erreur de lecture:', err);
+                    });
+                });
+                
+                await Promise.all(playPromises);
+                
                 masterBtn.innerText = "⏸ Pause";
                 masterBtn.style.backgroundColor = "#ffa502";
                 isPlaying = true;
