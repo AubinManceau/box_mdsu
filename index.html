@@ -186,33 +186,36 @@
             mixerContainer.appendChild(card);
         });
 
-        // 4. Contrôle Master avec synchronisation améliorée
+        // 4. Contrôle Master avec synchronisation parfaite
         masterBtn.addEventListener('click', async () => {
             if (!isPlaying) {
-                // 1. Pause toutes les pistes d'abord (au cas où)
+                // 1. Pause toutes les pistes
                 audioElements.forEach(audio => audio.pause());
                 
-                // 2. Appliquer le statut muted
+                // 2. Appliquer le statut muted AVANT de charger
                 audioElements.forEach((audio, index) => {
                     const card = mixerContainer.children[index];
                     audio.muted = !card.classList.contains('active');
                 });
                 
-                // 3. Réinitialiser au même point de départ
-                audioElements.forEach(audio => {
-                    audio.currentTime = 0;
+                // 3. Recharger complètement toutes les pistes pour garantir currentTime = 0
+                // load() force le rechargement et remet currentTime à 0 de manière fiable
+                const loadPromises = audioElements.map(audio => {
+                    return new Promise((resolve) => {
+                        audio.addEventListener('canplay', resolve, { once: true });
+                        audio.load(); // Force le rechargement complet
+                    });
                 });
                 
-                // 4. Démarrer TOUTES les pistes de manière synchrone
-                // On ne fait pas await pour chaque promesse individuellement
-                try {
-                    // Lancer toutes les lectures en même temps
-                    for (const audio of audioElements) {
-                        audio.play().catch(err => console.error('Erreur:', err));
-                    }
-                } catch (err) {
+                // 4. Attendre que TOUTES les pistes soient prêtes
+                await Promise.all(loadPromises);
+                
+                // 5. Maintenant, démarrer toutes les pistes EN MÊME TEMPS
+                const playPromises = audioElements.map(audio => audio.play().catch(err => {
                     console.error('Erreur de lecture:', err);
-                }
+                }));
+                
+                await Promise.all(playPromises);
                 
                 masterBtn.innerText = "⏸ Pause";
                 masterBtn.style.backgroundColor = "#ffa502";
