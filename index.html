@@ -124,10 +124,6 @@
         const masterBtn = document.getElementById('master-control');
         const mixerContainer = document.getElementById('mixer');
         
-        // Précharger tous les fichiers audio
-        let loadedCount = 0;
-        const totalTracks = tracksConfig.length;
-
         // Fonction utilitaire pour formater le temps (ex: 125s -> 02:05)
         function formatTime(seconds) {
             if (isNaN(seconds)) return "00:00";
@@ -140,7 +136,7 @@
             // 1. Audio Setup
             const audio = new Audio(track.file);
             audio.loop = true;
-            audio.preload = 'auto'; // Précharge complètement le fichier
+            audio.preload = 'metadata'; // Charge seulement les métadonnées (meilleur pour mobile)
             audio.volume = track.defaultMute ? 0 : 1;
             audioElements.push(audio);
 
@@ -173,15 +169,6 @@
             audio.addEventListener('loadedmetadata', () => {
                 totalTimeEl.innerText = formatTime(audio.duration);
             });
-            
-            // Vérifier que le fichier est complètement chargé
-            audio.addEventListener('canplaythrough', () => {
-                loadedCount++;
-                if (loadedCount === totalTracks) {
-                    masterBtn.disabled = false;
-                    masterBtn.style.opacity = '1';
-                }
-            });
 
             // Quand le temps avance (mise à jour barre et compteur)
             audio.addEventListener('timeupdate', () => {
@@ -197,10 +184,6 @@
 
             mixerContainer.appendChild(card);
         });
-        
-        // Désactiver le bouton jusqu'à ce que tous les fichiers soient chargés
-        masterBtn.disabled = true;
-        masterBtn.style.opacity = '0.5';
 
         // 4. Contrôle Master avec synchronisation améliorée
         masterBtn.addEventListener('click', async () => {
